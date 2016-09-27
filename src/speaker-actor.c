@@ -20,6 +20,7 @@ static PACTOR speakerActor = NULL;
 
 static void SpeakerActorOnPlayRequest(PVOID pParam)
 {
+	FILE* mediaFile;
 	char* message = (char*)pParam;
 	char **znpSplitMessage;
 	char command[255];
@@ -28,11 +29,15 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 	json_t* payloadJson = NULL;
 	json_t* paramsJson = NULL;
 	json_t* songJson = NULL;
+	json_t* repeatTimeJson = NULL;
 	json_t* responseJson = NULL;
 	json_t* statusJson = NULL;
+	char* fileName;
 	PACTORHEADER header;
 	char* responseTopic;
 	char* responseMessage;
+	BOOL bRepeat;
+	BYTE repeaTime;
 	znpSplitMessage = ActorSplitMessage(message);
 	if (znpSplitMessage == NULL)
 		return;
@@ -59,15 +64,34 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 		ActorFreeHeaderStruct(header);
 		return;
 	}
+	repeatTimeJson = json_object_get(paramsJson, "repeatTime");
+	if (repeatTimeJson == NULL)
+		repeaTime = 1;
+	else
+		repeaTime = json_integer_value(repeatTimeJson);
 	songJson = json_object_get(paramsJson, "song");
 	if (songJson == NULL)
 		result = 1;
 	else
 	{
-		sprintf(command,"mp321 \"%s\"", json_string_value(songJson));
-		system(command);
-		result = 0;
+		fileName = json_string_value(songJson);
+		mediaFile = fopen(fileName, "r");
+		if (mediaFile == NULL)
+			result = 1;
+		else
+		{
+			fclose(mediaFile);
+			if (strstr(fileName, ".mp3") == NULL)
+				result = 2;
+			else
+			{
+				sprintf(command, "mpg321 \"%s\" --loop %d", json_string_value(songJson), repeaTime);
+				system(command);
+				result = 0;
+			}
+		}
 	}
+	json_decref(repeatTimeJson);
 	json_decref(songJson);
 	json_decref(paramsJson);
 	json_decref(payloadJson);
@@ -79,13 +103,19 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 	json_object_set(responseJson, "request", requestJson);
 	json_decref(requestJson);
 	json_t* resultJson;
-	if (result == 0)
+	switch (result)
 	{
+	case 0:
 		resultJson = json_string("status.success");
-	}
-	else
-	{
-		resultJson = json_string("status.failure");
+		break;
+	case 1:
+		resultJson = json_string("status.failure.no_file");
+		break;
+	case 2:
+		resultJson = json_string("status.failure.not_mp3");
+		break;
+	default:
+		break;
 	}
 	json_object_set(statusJson, "status", resultJson);
 	json_decref(resultJson);
