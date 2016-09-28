@@ -32,11 +32,11 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 	json_t* repeatTimeJson = NULL;
 	json_t* responseJson = NULL;
 	json_t* statusJson = NULL;
+	json_t* errorJson = NULL;
 	char* fileName;
 	PACTORHEADER header;
 	char* responseTopic;
 	char* responseMessage;
-	BOOL bRepeat;
 	BYTE repeaTime;
 	znpSplitMessage = ActorSplitMessage(message);
 	if (znpSplitMessage == NULL)
@@ -74,7 +74,7 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 		result = 1;
 	else
 	{
-		fileName = json_string_value(songJson);
+		fileName = StrDup(json_string_value(songJson));
 		mediaFile = fopen(fileName, "r");
 		if (mediaFile == NULL)
 			result = 1;
@@ -90,6 +90,7 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 				result = 0;
 			}
 		}
+		free(fileName);
 	}
 	json_decref(repeatTimeJson);
 	json_decref(songJson);
@@ -107,18 +108,23 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 	{
 	case 0:
 		resultJson = json_string("status.success");
+		errorJson = json_string("error.none");
 		break;
 	case 1:
-		resultJson = json_string("status.failure.no_file");
+		resultJson = json_string("status.failure");
+		errorJson = json_string("error.file_not_found");
 		break;
 	case 2:
-		resultJson = json_string("status.failure.not_mp3");
+		resultJson = json_string("status.failure");
+		errorJson = json_string("error.not_mp3_file");
 		break;
 	default:
 		break;
 	}
 	json_object_set(statusJson, "status", resultJson);
+	json_object_set(statusJson, "error", errorJson);
 	json_decref(resultJson);
+	json_decref(errorJson);
 	json_object_set(responseJson, "response", statusJson);
 	json_decref(statusJson);
 	responseMessage = json_dumps(responseJson, JSON_INDENT(4) | JSON_REAL_PRECISION(4));
@@ -185,7 +191,7 @@ static void SpeakerActorCreate(char* guid, char* psw, char* host, WORD port)
 		return;
 	}
 	ActorRegisterCallback(speakerActor, ":request/play", SpeakerActorOnPlayRequest, CALLBACK_RETAIN);
-	ActorRegisterCallback(speakerActor, ":request/stop", SpeakerActorOnStopRequest, CALLBACK_RETAIN);
+	ActorRegisterCallback(speakerActor, ":request/stop_playing", SpeakerActorOnStopRequest, CALLBACK_RETAIN);
 }
 /*
 static void QrActorPublishQrContent(char* content)
