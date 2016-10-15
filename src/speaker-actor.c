@@ -128,11 +128,12 @@ static void SpeakerActorOnPlayRequest(PVOID pParam)
 	json_object_set(responseJson, "response", statusJson);
 	json_decref(statusJson);
 	responseMessage = json_dumps(responseJson, JSON_INDENT(4) | JSON_REAL_PRECISION(4));
-	responseTopic = ActorMakeTopicName(header->origin, "/:response");
+	//responseTopic = ActorMakeTopicName(header->origin, "/:response");
+	responseTopic = StrDup(header->origin);
 	ActorFreeHeaderStruct(header);
 	json_decref(responseJson);
 	ActorFreeSplitMessage(znpSplitMessage);
-	ActorSend(speakerActor, responseTopic, responseMessage, NULL, FALSE);
+	ActorSend(speakerActor, responseTopic, responseMessage, NULL, FALSE, "response");
 	free(responseMessage);
 	free(responseTopic);
 }
@@ -172,11 +173,12 @@ static void SpeakerActorOnStopRequest(PVOID pParam)
 	json_object_set(responseJson, "response", statusJson);
 	json_decref(statusJson);
 	responseMessage = json_dumps(responseJson, JSON_INDENT(4) | JSON_REAL_PRECISION(4));
-	responseTopic = ActorMakeTopicName(header->origin, "/:response");
+	//responseTopic = ActorMakeTopicName(header->origin, "/:response");
+	responseTopic = StrDup(header->origin);
 	ActorFreeHeaderStruct(header);
 	json_decref(responseJson);
 	ActorFreeSplitMessage(znpSplitMessage);
-	ActorSend(speakerActor, responseTopic, responseMessage, NULL, FALSE);
+	ActorSend(speakerActor, responseTopic, responseMessage, NULL, FALSE, "response");
 	free(responseMessage);
 	free(responseTopic);
 }
@@ -190,8 +192,13 @@ static void SpeakerActorCreate(char* guid, char* psw, char* host, WORD port)
 		printf("Couldn't create actor\n");
 		return;
 	}
-	ActorRegisterCallback(speakerActor, ":request/play", SpeakerActorOnPlayRequest, CALLBACK_RETAIN);
-	ActorRegisterCallback(speakerActor, ":request/stop_playing", SpeakerActorOnStopRequest, CALLBACK_RETAIN);
+	char* topicName;
+	topicName = ActorMakeTopicName("action/", guid, "/play");
+	ActorRegisterCallback(speakerActor, topicName, SpeakerActorOnPlayRequest, CALLBACK_RETAIN);
+	free(topicName);
+	topicName = ActorMakeTopicName("action/", guid, "/stop_playing");
+	ActorRegisterCallback(speakerActor, topicName, SpeakerActorOnStopRequest, CALLBACK_RETAIN);
+	free(topicName);
 }
 /*
 static void QrActorPublishQrContent(char* content)
